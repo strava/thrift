@@ -20,7 +20,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
-import 'package:collection/equality.dart';
+import 'package:collection/collection.dart';
+import 'package:http/http.dart' as http;
 import 'package:thrift/thrift.dart';
 import 'package:thrift/thrift_console.dart';
 import 'package:thrift_test/thrift_test.dart';
@@ -112,9 +113,13 @@ ArgResults _parseArgs(List<String> args) {
       });
   parser.addOption('protocol',
       defaultsTo: 'binary',
-      allowed: ['binary', 'json'],
+      allowed: ['binary', 'compact', 'json'],
       help: 'The protocol name',
-      allowedHelp: {'binary': 'TBinaryProtocol', 'json': 'TJsonProtocol'});
+      allowedHelp: {
+        'binary': 'TBinaryProtocol',
+        'compact': 'TCompactProtocol',
+        'json': 'TJsonProtocol'
+      });
   parser.addFlag('verbose', defaultsTo: false);
 
   ArgResults results;
@@ -132,6 +137,8 @@ ArgResults _parseArgs(List<String> args) {
 TProtocolFactory getProtocolFactory(String protocolType) {
   if (protocolType == 'binary') {
     return new TBinaryProtocolFactory();
+  } else if (protocolType == 'compact') {
+    return new TCompactProtocolFactory();
   } else if (protocolType == 'json') {
     return new TJsonProtocolFactory();
   }
@@ -145,8 +152,9 @@ Future _initTestClient(
   var protocolFactory = getProtocolFactory(protocolType);
 
   if (transportType == 'http') {
-    var httpClient = new HttpClient();
-    var config = new THttpConfig(Uri.parse('http://localhost'), {});
+    var httpClient = new http.IOClient();
+    var uri = Uri.parse('http://$host:$port');
+    var config = new THttpConfig(uri, {});
     transport = new THttpClientTransport(httpClient, config);
   } else {
     var socket = await Socket.connect(host, port);
@@ -243,7 +251,7 @@ List<TTest> _createTests() {
   }));
 
   tests.add(new TTest(TEST_CONTAINERS, 'testSet', () async {
-    var input = new Set.from([-2, -1, 0, 1, 2]);
+    var input = new Set<int>.from([-2, -1, 0, 1, 2]);
     var result = await client.testSet(input);
     var equality = const SetEquality();
     if (!equality.equals(result, input)) throw new TTestError(result, input);
@@ -303,7 +311,7 @@ List<TTest> _createTests() {
   tests.add(new TTest(TEST_EXCEPTIONS, 'testException', () async {
     try {
       await client.testException('Xception');
-    } on Xception catch (x) {
+    } on Xception catch (_) {
       return;
     }
 
@@ -313,7 +321,7 @@ List<TTest> _createTests() {
   tests.add(new TTest(TEST_EXCEPTIONS, 'testMultiException', () async {
     try {
       await client.testMultiException('Xception2', 'foo');
-    } on Xception2 catch (x) {
+    } on Xception2 catch (_) {
       return;
     }
 

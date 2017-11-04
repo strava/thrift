@@ -18,10 +18,9 @@
 #
 
 from __future__ import absolute_import
+import logging
 import socket
 import struct
-import logging
-logger = logging.getLogger(__name__)
 
 from .transport.TTransport import TTransportException, TTransportBase, TMemoryBuffer
 
@@ -31,6 +30,8 @@ from contextlib import contextmanager
 from tornado import gen, iostream, ioloop, tcpserver, concurrent
 
 __all__ = ['TTornadoServer', 'TTornadoStreamTransport']
+
+logger = logging.getLogger(__name__)
 
 
 class _Lock(object):
@@ -163,7 +164,7 @@ class TTornadoServer(tcpserver.TCPServer):
 
     @gen.coroutine
     def handle_stream(self, stream, address):
-        host, port = address
+        host, port = address[:2]
         trans = TTornadoStreamTransport(host=host, port=port, stream=stream,
                                         io_loop=self.io_loop)
         oprot = self._oprot_factory.getProtocol(trans)

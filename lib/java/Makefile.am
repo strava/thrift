@@ -19,8 +19,6 @@
 
 export CLASSPATH
 
-THRIFT = $(top_builddir)/compiler/cpp/thrift
-
 all-local:
 	$(ANT) $(ANT_FLAGS)
 
@@ -44,6 +42,7 @@ EXTRA_DIST = \
 	build.properties \
 	CMakeLists.txt \
 	coding_standards.md \
+	android \
 	src \
 	test \
 	README.md

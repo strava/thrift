@@ -25,6 +25,7 @@ uses
   Classes, Windows, SysUtils,
   Skiptest.One,
   Thrift in '..\..\src\Thrift.pas',
+  Thrift.Socket in '..\..\src\Thrift.Socket.pas',
   Thrift.Transport in '..\..\src\Thrift.Transport.pas',
   Thrift.Protocol in '..\..\src\Thrift.Protocol.pas',
   Thrift.Protocol.JSON in '..\..\src\Thrift.Protocol.JSON.pas',
@@ -43,7 +44,7 @@ const
 function CreatePing : IPing;
 begin
   result := TPingImpl.Create;
-  result.Version1  := Skiptest.One.TConstants.SKIPTESTSERVICE_VERSION;
+  result.Version1  := Tskiptest_version_1Constants.SKIPTESTSERVICE_VERSION;
 end;
 
 
@@ -178,7 +179,7 @@ const
   FILE_JSON   = 'pingpong.json';
 begin
   try
-    Writeln( 'Delphi SkipTest '+IntToStr(TConstants.SKIPTESTSERVICE_VERSION)+' using '+Thrift.Version);
+    Writeln( 'Delphi SkipTest '+IntToStr(Tskiptest_version_1Constants.SKIPTESTSERVICE_VERSION)+' using '+Thrift.Version);
 
     Writeln;
     Writeln('Binary protocol');

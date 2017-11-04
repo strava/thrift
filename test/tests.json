@@ -5,14 +5,24 @@
       "Linux"
     ],
     "server": {
-      "delay": 1,
       "command": [
-        "test_server"
+        "test_server",
+        "--lt-debug"
       ]
     },
     "client": {
       "command": [
-        "test_client"
+        "test_client",
+        "--lt-debug"
+      ],
+      "protocols": [
+        "multi",
+        "multic",
+        "multi:binary",
+        "multic:compact"
+      ],
+      "sockets": [
+        "ip-ssl"
       ]
     },
     "transports": [
@@ -23,14 +33,42 @@
       "ip"
     ],
     "protocols": [
-      "binary"
+      "binary",
+      "compact"
     ],
     "workdir": "c_glib"
   },
   {
+    "name": "d",
+    "server": {
+      "command": [
+        "thrift_test_server"
+      ]
+    },
+    "client": {
+      "command": [
+        "thrift_test_client"
+      ]
+    },
+    "transports": [
+      "http",
+      "buffered",
+      "framed"
+    ],
+    "sockets": [
+      "ip",
+      "ip-ssl"
+    ],
+    "protocols": [
+      "binary",
+      "compact",
+      "json"
+    ],
+    "workdir": "../lib/d/test"
+  },
+  {
     "name": "go",
     "server": {
-      "delay": 1,
       "command": [
         "testserver",
         "--certPath=../../keys"
@@ -44,7 +82,8 @@
     },
     "transports": [
       "buffered",
-      "framed"
+      "framed",
+      "http"
     ],
     "sockets": [
       "ip",
@@ -74,8 +113,16 @@
       "compile-test"
     ],
     "server": {
-      "delay": 5,
-      "extra_args": ["run-testserver"]
+      "delay": 10,
+      "extra_args": ["run-testserver"],
+      "protocols": [
+        "binary:multi",
+        "compact:multic",
+        "json:multij",
+        "multi",
+        "multic",
+        "multij"
+      ]
     },
     "client": {
       "timeout": 13,
@@ -90,12 +137,12 @@
       "framed:fastframed"
     ],
     "sockets": [
-      "ip-ssl",
-      "ip"
+      "ip",
+      "ip-ssl"
     ],
     "protocols": [
-      "compact",
       "binary",
+      "compact",
       "json"
     ],
     "workdir": "../lib/java"
@@ -106,7 +153,6 @@
       "NODE_PATH": "../lib"
     },
     "server": {
-      "delay": 1,
       "command": [
         "node",
         "server.js",
@@ -114,7 +160,7 @@
       ]
     },
     "client": {
-      "timeout": 2.9,
+      "timeout": 6,
       "command": [
         "node",
         "client.js",
@@ -123,7 +169,8 @@
     },
     "transports": [
       "buffered",
-      "framed"
+      "framed",
+      "http"
     ],
     "sockets": [
       "ip",
@@ -169,7 +216,6 @@
   {
     "name": "py",
     "server": {
-      "delay": 1,
       "extra_args": ["TSimpleServer"],
       "command": [
         "TestServer.py",
@@ -198,7 +244,8 @@
       "compact",
       "binary",
       "json",
-      "binary:accel"
+      "binary:accel",
+      "compact:accelc"
     ],
     "workdir": "py"
   },
@@ -206,13 +253,11 @@
     "comment": "Using 'python3' executable to test py2 and 3 at once",
     "name": "py3",
     "server": {
-      "delay": 1,
       "extra_args": ["TSimpleServer"],
       "command": [
         "python3",
         "TestServer.py",
         "--verbose",
-        "--libpydir=../../lib/py/build/lib",
         "--genpydir=gen-py"
       ]
     },
@@ -222,7 +267,6 @@
         "python3",
         "TestClient.py",
         "--host=localhost",
-        "--libpydir=../../lib/py/build/lib",
         "--genpydir=gen-py"
       ]
     },
@@ -237,14 +281,15 @@
     "protocols": [
       "compact",
       "binary",
-      "json"
+      "json",
+      "binary:accel",
+      "compact:accelc"
     ],
     "workdir": "py"
   },
   {
     "name": "cpp",
     "server": {
-      "delay": 2,
       "command": [
         "TestServer"
       ]
@@ -276,7 +321,6 @@
   {
     "name": "rb",
     "server": {
-      "delay": 1,
       "command": [
         "ruby",
         "../integration/TestServer.rb"
@@ -286,8 +330,7 @@
       "timeout": 5,
       "command": [
         "ruby",
-        "../integration/TestClient.rb",
-        "--host=127.0.0.1"
+        "../integration/TestClient.rb"
       ]
     },
     "transports": [
@@ -308,7 +351,7 @@
   {
     "name": "csharp",
     "env": {
-      "MONO_PATH": "../.."
+      "MONO_PATH": "../../lib/csharp/"
     },
     "transports": [
       "buffered",
@@ -324,7 +367,6 @@
       "json"
     ],
     "server": {
-      "delay": 3,
       "command": [
         "mono",
         "TestClientServer.exe",
@@ -339,7 +381,45 @@
         "client"
       ]
     },
-    "workdir": "../lib/csharp/test/ThriftTest"
+    "workdir": "csharp"
+  },
+  {
+    "name": "netcore",
+    "transports": [
+      "buffered",
+      "framed"
+    ],
+    "sockets": [
+      "ip",
+      "ip-ssl"
+    ],
+    "protocols": [
+      "binary",
+      "compact",
+      "json"
+    ],
+    "server-disabled": {
+      "command": [
+        "dotnet",
+        "run",
+	"--no-build",
+	"--no-restore",
+	"--",
+        "server"
+      ]
+    },
+    "client": {
+      "timeout": 10,
+      "command": [
+        "dotnet",
+        "run",
+	"--no-build",
+	"--no-restore",
+	"--",
+        "client"
+      ]
+    },
+    "workdir": "netcore/ThriftTest"
   },
   {
     "name": "perl",
@@ -361,7 +441,9 @@
         "-Igen-perl/",
         "-I../../lib/perl/lib/",
         "TestClient.pl",
-        "--cert=../../test/keys/client.pem"
+        "--ca=../keys/CA.pem",
+        "--cert=../keys/client.crt",
+        "--key=../keys/client.key"
       ]
     },
     "server": {
@@ -370,8 +452,8 @@
         "-Igen-perl/",
         "-I../../lib/perl/lib/",
         "TestServer.pl",
-        "--cert=../../test/keys/server.pem",
-        "--key=../../test/keys/server.key"
+        "--cert=../keys/server.crt",
+        "--key=../keys/server.key"
       ]
     },
     "workdir": "perl"
@@ -394,6 +476,12 @@
       ],
       "command": [
         "php",
+        "-dextension_dir=php_ext_dir",
+        "--php-ini=test_php.ini",
+        "--no-php-ini",
+        "-ddisplay_errors=stderr",
+        "-dlog_errors=0",
+        "-derror_reporting=E_ALL",
         "TestClient.php"
       ]
     },
@@ -412,6 +500,7 @@
       ],
       "protocols": [
         "binary",
+        "compact",
         "json"
       ],
       "command": [
@@ -454,7 +543,6 @@
       ]
     },
     "server": {
-      "delay": 5,
       "command": [
         "erl",
         "+K",
@@ -489,5 +577,66 @@
       ]
     },
     "workdir": "../lib/js"
+  },
+  {
+    "name": "lua",
+    "TODO": "Add dll to LUA_CPATH",
+    "env": {
+      "LUA_PATH": ";;gen-lua/?.lua;../../lib/lua/?.lua",
+      "LUA_CPATH": ";;../../lib/lua/.libs/?.so"
+    },
+    "client": {
+      "timeout": 5,
+      "transports": [
+        "buffered",
+        "framed",
+        "http"
+      ],
+      "sockets": [
+        "ip"
+      ],
+      "protocols": [
+        "binary",
+        "compact",
+        "json"
+      ],
+      "command": [
+        "lua",
+        "test_basic_client.lua"
+      ]
+    },
+    "workdir": "lua"
+  },
+  {
+    "name": "rs",
+    "env": {
+      "RUST_BACKTRACE": "1",
+      "RUST_LOG": "info"
+    },
+    "server": {
+      "command": [
+        "test_server"
+      ]
+    },
+    "client": {
+      "timeout": 6,
+      "command": [
+        "test_client"
+      ]
+    },
+    "sockets": [
+      "ip"
+    ],
+    "transports": [
+      "buffered",
+      "framed"
+    ],
+    "protocols": [
+      "binary",
+      "compact",
+      "multi",
+      "multic"
+    ],
+    "workdir": "rs/bin"
   }
 ]

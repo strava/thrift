@@ -23,7 +23,7 @@
 #include <thrift/protocol/TVirtualProtocol.h>
 
 #include <stack>
-#include <boost/shared_ptr.hpp>
+#include <thrift/stdcxx.h>
 
 namespace apache {
 namespace thrift {
@@ -34,11 +34,12 @@ namespace protocol {
  */
 template <class Transport_>
 class TCompactProtocolT : public TVirtualProtocol<TCompactProtocolT<Transport_> > {
-
-protected:
+public:
   static const int8_t PROTOCOL_ID = (int8_t)0x82u;
   static const int8_t VERSION_N = 1;
   static const int8_t VERSION_MASK = 0x1f;       // 0001 1111
+
+protected:
   static const int8_t TYPE_MASK = (int8_t)0xE0u; // 1110 0000
   static const int8_t TYPE_BITS = 0x07;          // 0000 0111
   static const int32_t TYPE_SHIFT_AMOUNT = 5;
@@ -73,7 +74,7 @@ protected:
   int16_t lastFieldId_;
 
 public:
-  TCompactProtocolT(boost::shared_ptr<Transport_> trans)
+  TCompactProtocolT(stdcxx::shared_ptr<Transport_> trans)
     : TVirtualProtocol<TCompactProtocolT<Transport_> >(trans),
       trans_(trans.get()),
       lastFieldId_(0),
@@ -85,7 +86,7 @@ public:
     boolValue_.hasBoolValue = false;
   }
 
-  TCompactProtocolT(boost::shared_ptr<Transport_> trans,
+  TCompactProtocolT(stdcxx::shared_ptr<Transport_> trans,
                     int32_t string_limit,
                     int32_t container_limit)
     : TVirtualProtocol<TCompactProtocolT<Transport_> >(trans),
@@ -238,8 +239,8 @@ public:
 
   void setContainerSizeLimit(int32_t container_limit) { container_limit_ = container_limit; }
 
-  boost::shared_ptr<TProtocol> getProtocol(boost::shared_ptr<TTransport> trans) {
-    boost::shared_ptr<Transport_> specific_trans = boost::dynamic_pointer_cast<Transport_>(trans);
+  stdcxx::shared_ptr<TProtocol> getProtocol(stdcxx::shared_ptr<TTransport> trans) {
+    stdcxx::shared_ptr<Transport_> specific_trans = stdcxx::dynamic_pointer_cast<Transport_>(trans);
     TProtocol* prot;
     if (specific_trans) {
       prot = new TCompactProtocolT<Transport_>(specific_trans, string_limit_, container_limit_);
@@ -247,7 +248,7 @@ public:
       prot = new TCompactProtocol(trans, string_limit_, container_limit_);
     }
 
-    return boost::shared_ptr<TProtocol>(prot);
+    return stdcxx::shared_ptr<TProtocol>(prot);
   }
 
 private:

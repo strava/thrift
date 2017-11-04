@@ -177,7 +177,7 @@ unittest/.directory:
 	touch $@
 
 unittest/debug/%: src/%.d $(all_targets) unittest/emptymain.d
-	$(DMD) -gc -of$(subst /,$(DMD_OF_DIRSEP),$@) $(d_test_flags) $^
+	$(DMD) -g -of$(subst /,$(DMD_OF_DIRSEP),$@) $(d_test_flags) $^
 
 unittest/release/%: src/%.d $(all_targets) unittest/emptymain.d
 	$(DMD) -O -release -of$(subst /,$(DMD_OF_DIRSEP),$@) $(d_test_flags) $^
@@ -185,6 +185,8 @@ unittest/release/%: src/%.d $(all_targets) unittest/emptymain.d
 TESTS = $(addprefix unittest/debug/, $(d_test_modules)) \
 	$(addprefix unittest/release/, $(d_test_modules))
 
+precross: all-local
+	$(MAKE) -C test precross
 
 EXTRA_DIST = \
 	src \

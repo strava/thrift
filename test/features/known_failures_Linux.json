@@ -5,6 +5,10 @@
   "csharp-limit_container_length_compact_buffered-ip",
   "csharp-limit_string_length_binary_buffered-ip",
   "csharp-limit_string_length_compact_buffered-ip",
+  "d-limit_container_length_binary_buffered-ip",
+  "d-limit_container_length_compact_buffered-ip",
+  "d-limit_string_length_binary_buffered-ip",
+  "d-limit_string_length_compact_buffered-ip",
   "erl-limit_container_length_binary_buffered-ip",
   "erl-limit_container_length_compact_buffered-ip",
   "erl-limit_string_length_binary_buffered-ip",
@@ -28,5 +32,9 @@
   "rb-limit_container_length_compact_buffered-ip",
   "rb-limit_string_length_accel-binary_buffered-ip",
   "rb-limit_string_length_binary_buffered-ip",
-  "rb-limit_string_length_compact_buffered-ip"
+  "rb-limit_string_length_compact_buffered-ip",
+  "rs-limit_string_length_binary_buffered-ip",
+  "rs-limit_string_length_compact_buffered-ip",
+  "rs-limit_container_length_binary_buffered-ip",
+  "rs-limit_container_length_compact_buffered-ip"
 ]

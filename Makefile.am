@@ -19,7 +19,15 @@
 
 ACLOCAL_AMFLAGS = -I ./aclocal
 
+if WITH_PLUGIN
+# To enable bootstrap, build order is lib/cpp -> compiler -> others
+SUBDIRS = lib/cpp compiler/cpp lib
+if WITH_TESTS
+SUBDIRS += lib/cpp/test
+endif
+else
 SUBDIRS = compiler/cpp lib
+endif
 
 if WITH_TESTS
 SUBDIRS += test
@@ -35,31 +43,43 @@ dist-hook:
 	find $(distdir) -type d \( -iname ".svn" -or -iname ".git" \) | xargs rm -rf
 
 print-version:
-	@echo $(VERSION)
+	@echo $(PACKAGE_VERSION)
 
 .PHONY: precross cross
 precross-%: all
 	$(MAKE) -C $* precross
 precross: all precross-test precross-lib
 
-# TODO: generate --server and --client switches from "--with(out)-..." build flags
-
-
 empty :=
 space := $(empty) $(empty)
 comma := ,
 
-CROSS_LANGS = @MAYBE_CPP@ @MAYBE_C_GLIB@ @MAYBE_JAVA@ @MAYBE_CSHARP@ @MAYBE_PYTHON@ @MAYBE_PY3@ @MAYBE_RUBY@ @MAYBE_HASKELL@ @MAYBE_PERL@ @MAYBE_PHP@ @MAYBE_GO@ @MAYBE_NODEJS@ @MAYBE_DART@ @MAYBE_ERLANG@
+CROSS_LANGS = @MAYBE_CPP@ @MAYBE_C_GLIB@ @MAYBE_D@ @MAYBE_JAVA@ @MAYBE_CSHARP@ @MAYBE_PYTHON@ @MAYBE_PY3@ @MAYBE_RUBY@ @MAYBE_HASKELL@ @MAYBE_PERL@ @MAYBE_PHP@ @MAYBE_GO@ @MAYBE_NODEJS@ @MAYBE_DART@ @MAYBE_ERLANG@ @MAYBE_LUA@ @MAYBE_RS@ @MAYBE_DOTNETCORE@
 CROSS_LANGS_COMMA_SEPARATED = $(subst $(space),$(comma),$(CROSS_LANGS))
 
-cross: precross
-	$(PYTHON) test/test.py -F.* -s --server $(CROSS_LANGS_COMMA_SEPARATED)
-	$(PYTHON) test/test.py -s --server $(CROSS_LANGS_COMMA_SEPARATED) --client $(CROSS_LANGS_COMMA_SEPARATED)
+if WITH_PY3
+CROSS_PY=$(PYTHON3)
+else
+CROSS_PY=$(PYTHON)
+endif
+
+if WITH_PYTHON
+crossfeature: precross
+	$(CROSS_PY) test/test.py --retry-count 3 --features .* --skip-known-failures --server $(CROSS_LANGS_COMMA_SEPARATED)
+else
+# feature test needs python build
+crossfeature:
+endif
+
+cross-%: precross crossfeature
+	$(CROSS_PY) test/test.py --retry-count 3 --skip-known-failures --server $(CROSS_LANGS_COMMA_SEPARATED) --client $(CROSS_LANGS_COMMA_SEPARATED) --regex "$*"
+
+cross: cross-.*
 
 TIMES = 1 2 3
 fail: precross
-	$(PYTHON) test/test.py || true
-	$(PYTHON) test/test.py --update-expected-failures=overwrite
+	$(CROSS_PY) test/test.py || true
+	$(CROSS_PY) test/test.py --update-expected-failures=overwrite
 	$(foreach var,$(TIMES),test/test.py -s || true;test/test.py --update-expected-failures=merge;)
 
 codespell_skip_files = \
@@ -103,7 +123,9 @@ EXTRA_DIST = \
 	doap.rdf \
 	package.json \
 	sonar-project.properties \
+	LANGUAGES.md \
 	LICENSE \
 	CHANGES \
 	NOTICE \
-	README.md
+	README.md \
+	Thrift.podspec

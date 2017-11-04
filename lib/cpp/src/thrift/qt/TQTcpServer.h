@@ -23,7 +23,7 @@
 #include <QObject>
 #include <QTcpServer>
 
-#include <boost/shared_ptr.hpp>
+#include <thrift/stdcxx.h>
 
 namespace apache {
 namespace thrift {
@@ -47,30 +47,32 @@ class TAsyncProcessor;
 class TQTcpServer : public QObject {
   Q_OBJECT
 public:
-  TQTcpServer(boost::shared_ptr<QTcpServer> server,
-              boost::shared_ptr<TAsyncProcessor> processor,
-              boost::shared_ptr<apache::thrift::protocol::TProtocolFactory> protocolFactory,
-              QT_PREPEND_NAMESPACE(QObject)* parent = NULL);
+  TQTcpServer(stdcxx::shared_ptr<QTcpServer> server,
+              stdcxx::shared_ptr<TAsyncProcessor> processor,
+              stdcxx::shared_ptr<apache::thrift::protocol::TProtocolFactory> protocolFactory,
+              QObject* parent = NULL);
   virtual ~TQTcpServer();
 
 private Q_SLOTS:
   void processIncoming();
   void beginDecode();
   void socketClosed();
+  void deleteConnectionContext(QTcpSocket* connection);
 
 private:
-  TQTcpServer(const TQTcpServer&);
-  TQTcpServer& operator=(const TQTcpServer&);
+  Q_DISABLE_COPY(TQTcpServer)
 
   struct ConnectionContext;
 
-  void finish(boost::shared_ptr<ConnectionContext> ctx, bool healthy);
+  void scheduleDeleteConnectionContext(QTcpSocket* connection);
+  void finish(stdcxx::shared_ptr<ConnectionContext> ctx, bool healthy);
 
-  boost::shared_ptr<QTcpServer> server_;
-  boost::shared_ptr<TAsyncProcessor> processor_;
-  boost::shared_ptr<apache::thrift::protocol::TProtocolFactory> pfact_;
+  stdcxx::shared_ptr<QTcpServer> server_;
+  stdcxx::shared_ptr<TAsyncProcessor> processor_;
+  stdcxx::shared_ptr<apache::thrift::protocol::TProtocolFactory> pfact_;
 
-  std::map<QT_PREPEND_NAMESPACE(QTcpSocket)*, boost::shared_ptr<ConnectionContext> > ctxMap_;
+  typedef std::map<QTcpSocket*, stdcxx::shared_ptr<ConnectionContext> > ConnectionContextMap;
+  ConnectionContextMap ctxMap_;
 };
 }
 }

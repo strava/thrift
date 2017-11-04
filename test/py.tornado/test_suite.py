@@ -27,7 +27,7 @@ import time
 import unittest
 
 basepath = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, basepath+'/gen-py.tornado')
+sys.path.insert(0, basepath + '/gen-py.tornado')
 sys.path.insert(0, glob.glob(os.path.join(basepath, '../../lib/py/build/lib*'))[0])
 
 try:
@@ -44,7 +44,7 @@ from thrift.protocol import TBinaryProtocol
 from thrift.transport.TTransport import TTransportException
 
 from ThriftTest import ThriftTest
-from ThriftTest.ttypes import *
+from ThriftTest.ttypes import Xception, Xtruct
 
 
 class TestHandler(object):

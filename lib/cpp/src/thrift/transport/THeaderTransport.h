@@ -21,26 +21,33 @@
 #define THRIFT_TRANSPORT_THEADERTRANSPORT_H_ 1
 
 #include <bitset>
+#include <limits>
 #include <vector>
+#include <stdexcept>
 #include <string>
 #include <map>
 
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#elif HAVE_INTTYPES_H
+#include <inttypes.h>
+#endif
+
 #include <boost/scoped_array.hpp>
-#include <boost/shared_ptr.hpp>
+#include <thrift/stdcxx.h>
 
 #include <thrift/protocol/TProtocolTypes.h>
 #include <thrift/transport/TBufferTransports.h>
 #include <thrift/transport/TTransport.h>
 #include <thrift/transport/TVirtualTransport.h>
 
-// Don't include the unknown client.
-#define CLIENT_TYPES_LEN 3
-
 enum CLIENT_TYPE {
   THRIFT_HEADER_CLIENT_TYPE = 0,
-  THRIFT_FRAMED_DEPRECATED = 1,
-  THRIFT_UNFRAMED_DEPRECATED = 2,
-  THRIFT_UNKNOWN_CLIENT_TYPE = 4,
+  THRIFT_FRAMED_BINARY = 1,
+  THRIFT_UNFRAMED_BINARY = 2,
+  THRIFT_FRAMED_COMPACT = 3,
+  THRIFT_UNFRAMED_COMPACT = 4,
+  THRIFT_UNKNOWN_CLIENT_TYPE = 5,
 };
 
 namespace apache {
@@ -68,8 +75,8 @@ public:
   static const int THRIFT_MAX_VARINT32_BYTES = 5;
 
   /// Use default buffer sizes.
-  explicit THeaderTransport(const boost::shared_ptr<TTransport>& transport)
-    : transport_(transport),
+  explicit THeaderTransport(const stdcxx::shared_ptr<TTransport>& transport)
+    : TVirtualTransport(transport),
       outTransport_(transport),
       protoId(T_COMPACT_PROTOCOL),
       clientType(THRIFT_HEADER_CLIENT_TYPE),
@@ -77,12 +84,13 @@ public:
       flags(0),
       tBufSize_(0),
       tBuf_(NULL) {
+    if (!transport_) throw std::invalid_argument("transport is empty");
     initBuffers();
   }
 
-  THeaderTransport(const boost::shared_ptr<TTransport> inTransport,
-                   const boost::shared_ptr<TTransport> outTransport)
-    : transport_(inTransport),
+  THeaderTransport(const stdcxx::shared_ptr<TTransport> inTransport,
+                   const stdcxx::shared_ptr<TTransport> outTransport)
+    : TVirtualTransport(inTransport),
       outTransport_(outTransport),
       protoId(T_COMPACT_PROTOCOL),
       clientType(THRIFT_HEADER_CLIENT_TYPE),
@@ -90,33 +98,15 @@ public:
       flags(0),
       tBufSize_(0),
       tBuf_(NULL) {
+    if (!transport_) throw std::invalid_argument("inTransport is empty");
+    if (!outTransport_) throw std::invalid_argument("outTransport is empty");
     initBuffers();
   }
 
-  void open() { transport_->open(); }
-
-  bool isOpen() { return transport_->isOpen(); }
-
-  bool peek() { return (this->rBase_ < this->rBound_) || transport_->peek(); }
-
-  void close() {
-    flush();
-    transport_->close();
-  }
-
   virtual uint32_t readSlow(uint8_t* buf, uint32_t len);
-  virtual uint32_t readAll(uint8_t* buf, uint32_t len);
   virtual void flush();
 
   void resizeTransformBuffer(uint32_t additionalSize = 0);
-
-  boost::shared_ptr<TTransport> getUnderlyingTransport() { return transport_; }
-
-  /*
-   * TVirtualTransport provides a default implementation of readAll().
-   * We want to use the TBufferBase version instead.
-   */
-  using TBufferBase::readAll;
 
   uint16_t getProtocolId() const;
   void setProtocolId(uint16_t protoId) { this->protoId = protoId; }
@@ -152,8 +142,7 @@ public:
   void transform(uint8_t* ptr, uint32_t sz);
 
   uint16_t getNumTransforms() const {
-    int trans = writeTrans_.size();
-    return trans;
+    return safe_numeric_cast<uint16_t>(writeTrans_.size());
   }
 
   void setTransform(uint16_t transId) { writeTrans_.push_back(transId); }
@@ -181,17 +170,13 @@ public:
   };
 
 protected:
-  std::bitset<CLIENT_TYPES_LEN> supported_clients;
-
-  void initSupportedClients(std::bitset<CLIENT_TYPES_LEN> const*);
-
   /**
    * Reads a frame of input from the underlying stream.
    *
    * Returns true if a frame was read successfully, or false on EOF.
    * (Raises a TTransportException if EOF occurs after a partial frame.)
    */
-  bool readFrame(uint32_t minFrameSize);
+  virtual bool readFrame();
 
   void ensureReadBuffer(uint32_t sz);
   uint32_t getWriteBytes();
@@ -201,8 +186,7 @@ protected:
     setWriteBuffer(wBuf_.get(), wBufSize_);
   }
 
-  boost::shared_ptr<TTransport> transport_;
-  boost::shared_ptr<TTransport> outTransport_;
+  stdcxx::shared_ptr<TTransport> outTransport_;
 
   // 0 and 16th bits must be 0 to differentiate from framed & unframed
   static const uint32_t HEADER_MAGIC = 0x0FFF0000;
@@ -226,7 +210,7 @@ protected:
   /**
    * Returns the maximum number of bytes that write k/v headers can take
    */
-  size_t getMaxWriteHeadersSize() const;
+  uint32_t getMaxWriteHeadersSize() const;
 
   struct infoIdType {
     enum idType {
@@ -281,8 +265,8 @@ public:
   /**
    * Wraps the transport into a header one.
    */
-  virtual boost::shared_ptr<TTransport> getTransport(boost::shared_ptr<TTransport> trans) {
-    return boost::shared_ptr<TTransport>(new THeaderTransport(trans));
+  virtual stdcxx::shared_ptr<TTransport> getTransport(stdcxx::shared_ptr<TTransport> trans) {
+    return stdcxx::shared_ptr<TTransport>(new THeaderTransport(trans));
   }
 };
 }

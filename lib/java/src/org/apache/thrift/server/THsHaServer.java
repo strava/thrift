@@ -131,7 +131,7 @@ public class THsHaServer extends TNonblockingServer {
   }
 
   /**
-   * @inheritDoc
+   * {@inheritDoc}
    */
   @Override
   protected void waitForShutdown() {
@@ -155,6 +155,9 @@ public class THsHaServer extends TNonblockingServer {
     return invoker;
   }
 
+  protected ExecutorService getInvoker() {
+    return invoker;
+  }
 
   protected void gracefullyShutdownInvokerPool() {
     // try to gracefully shut down the executor service

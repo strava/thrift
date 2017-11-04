@@ -38,7 +38,7 @@ class TSocket extends TTransport
    *
    * @var resource
    */
-  private $handle_ = null;
+  protected $handle_ = null;
 
   /**
    * Remote hostname
@@ -61,7 +61,7 @@ class TSocket extends TTransport
    *
    * @var int
    */
-  private $sendTimeoutSec_ = 0;
+  protected $sendTimeoutSec_ = 0;
 
   /**
    * Send timeout in microseconds.
@@ -70,7 +70,7 @@ class TSocket extends TTransport
    *
    * @var int
    */
-  private $sendTimeoutUsec_ = 100000;
+  protected $sendTimeoutUsec_ = 100000;
 
   /**
    * Recv timeout in seconds
@@ -79,7 +79,7 @@ class TSocket extends TTransport
    *
    * @var int
    */
-  private $recvTimeoutSec_ = 0;
+  protected $recvTimeoutSec_ = 0;
 
   /**
    * Recv timeout in microseconds
@@ -88,7 +88,7 @@ class TSocket extends TTransport
    *
    * @var int
    */
-  private $recvTimeoutUsec_ = 750000;
+  protected $recvTimeoutUsec_ = 750000;
 
   /**
    * Persistent socket or plain?
@@ -241,6 +241,11 @@ class TSocket extends TTransport
       }
       throw new TException($error);
     }
+
+    if (function_exists('socket_import_stream') && function_exists('socket_set_option')) {
+      $socket = socket_import_stream($this->handle_);
+      socket_set_option($socket, SOL_TCP, TCP_NODELAY, 1);
+    }
   }
 
   /**
@@ -248,10 +253,8 @@ class TSocket extends TTransport
    */
   public function close()
   {
-    if (!$this->persist_) {
-      @fclose($this->handle_);
-      $this->handle_ = null;
-    }
+    @fclose($this->handle_);
+    $this->handle_ = null;
   }
 
   /**
@@ -270,7 +273,7 @@ class TSocket extends TTransport
     $readable = @stream_select($read, $null, $null, $this->recvTimeoutSec_, $this->recvTimeoutUsec_);
 
     if ($readable > 0) {
-      $data = @stream_socket_recvfrom($this->handle_, $len);
+      $data = fread($this->handle_, $len);
       if ($data === false) {
           throw new TTransportException('TSocket: Could not read '.$len.' bytes from '.
                                $this->host_.':'.$this->port_);
@@ -304,7 +307,7 @@ class TSocket extends TTransport
       $writable = @stream_select($null, $write, $null, $this->sendTimeoutSec_, $this->sendTimeoutUsec_);
       if ($writable > 0) {
         // write buffer to stream
-        $written = @stream_socket_sendto($this->handle_, $buf);
+        $written = fwrite($this->handle_, $buf);
         if ($written === -1 || $written === false) {
           throw new TTransportException('TSocket: Could not write '.TStringFuncFactory::create()->strlen($buf).' bytes '.
                                    $this->host_.':'.$this->port_);

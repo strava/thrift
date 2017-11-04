@@ -19,6 +19,7 @@
 
 package org.apache.thrift.transport;
 
+import java.io.UnsupportedEncodingException;
 import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,6 +31,7 @@ import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
 
+import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,7 +132,12 @@ public class TSaslServerTransport extends TSaslTransport {
     }
 
     // Get the mechanism name.
-    String mechanismName = new String(message.payload);
+    String mechanismName;
+	try {
+		mechanismName = new String(message.payload, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+        throw new TTransportException("JVM DOES NOT SUPPORT UTF-8");
+      }
     TSaslServerDefinition serverDefinition = serverDefinitionMap.get(mechanismName);
     LOGGER.debug("Received mechanism name '{}'", mechanismName);
 
@@ -145,7 +152,7 @@ public class TSaslServerTransport extends TSaslTransport {
 
   /**
    * <code>TTransportFactory</code> to create
-   * <code>TSaslServerTransports<c/ode>. Ensures that a given
+   * <code>TSaslServerTransports</code>. Ensures that a given
    * underlying <code>TTransport</code> instance receives the same
    * <code>TSaslServerTransport</code>. This is kind of an awful hack to work
    * around the fact that Thrift is designed assuming that

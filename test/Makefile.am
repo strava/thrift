@@ -17,12 +17,17 @@
 # under the License.
 #
 
-SUBDIRS =
+SUBDIRS = features
 PRECROSS_TARGET =
 
 if WITH_C_GLIB
 SUBDIRS += c_glib
 PRECROSS_TARGET += precross-c_glib
+endif
+
+if WITH_MONO
+SUBDIRS += csharp
+PRECROSS_TARGET += precross-csharp
 endif
 
 if WITH_CPP
@@ -48,8 +53,10 @@ endif
 if WITH_PYTHON
 SUBDIRS += py
 PRECROSS_TARGET += precross-py
-SUBDIRS += py.twisted
 SUBDIRS += py.tornado
+if WITH_TWISTED_TEST
+SUBDIRS += py.twisted
+endif
 endif
 
 if WITH_RUBY
@@ -65,6 +72,10 @@ if WITH_HAXE
 SUBDIRS += haxe
 endif
 
+if WITH_DOTNETCORE
+SUBDIRS += netcore
+endif
+
 if WITH_GO
 SUBDIRS += go
 PRECROSS_TARGET += precross-go
@@ -73,6 +84,16 @@ endif
 if WITH_ERLANG
 SUBDIRS += erl
 PRECROSS_TARGET += precross-erl
+endif
+
+if WITH_LUA
+SUBDIRS += lua
+PRECROSS_TARGET += precross-lua
+endif
+
+if WITH_RS
+SUBDIRS += rs
+PRECROSS_TARGET += precross-rs
 endif
 
 #
@@ -90,6 +111,7 @@ EXTRA_DIST = \
 	keys \
 	c_glib \
 	cpp \
+	dart \
 	erl \
 	hs \
 	lua \
@@ -100,6 +122,7 @@ EXTRA_DIST = \
 	py.twisted \
 	py.tornado \
 	rb \
+	rs \
 	threads \
 	AnnotationTest.thrift \
 	BrokenConstants.thrift \
@@ -108,9 +131,11 @@ EXTRA_DIST = \
 	DenseLinkingTest.thrift \
 	DocTest.thrift \
 	EnumTest.thrift \
-	known_failures_Linux.json \
+	FullCamelTest.thrift \
 	Include.thrift \
 	JavaBeansTest.thrift \
+	JavaDeepCopyTest.thrift \
+	JavaTypes.thrift \
 	JsDeepConstructorTest.thrift \
 	ManyOptionals.thrift \
 	ManyTypedefs.thrift \
@@ -118,13 +143,17 @@ EXTRA_DIST = \
 	OptionalRequiredTest.thrift \
 	Recursive.thrift \
 	ReuseObjects.thrift \
+	EnumContainersTest.thrift \
 	SmallTest.thrift \
 	StressTest.thrift \
-	test.py \
-	tests.json \
 	ThriftTest.thrift \
 	TypedefTest.thrift \
-	result.html \
+	known_failures_Linux.json \
+	test.py \
+	tests.json \
+	rebuild_known_failures.sh \
+	result.js \
+	index.html \
 	README.md \
 	valgrind.suppress
 

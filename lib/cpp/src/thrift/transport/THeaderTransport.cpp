@@ -21,34 +21,31 @@
 #include <thrift/TApplicationException.h>
 #include <thrift/protocol/TProtocolTypes.h>
 #include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/protocol/TCompactProtocol.h>
+#include <thrift/stdcxx.h>
 
+#include <limits>
 #include <utility>
-#include <cassert>
 #include <string>
-#include <zlib.h>
 #include <string.h>
+#include <zlib.h>
 
 using std::map;
-using boost::shared_ptr;
 using std::string;
 using std::vector;
 
 namespace apache {
 namespace thrift {
+
+using stdcxx::shared_ptr;
+
 namespace transport {
 
 using namespace apache::thrift::protocol;
 using apache::thrift::protocol::TBinaryProtocol;
 
-uint32_t THeaderTransport::readAll(uint8_t* buf, uint32_t len) {
-  // We want to call TBufferBase's version here, because
-  // TFramedTransport would try and call its own readFrame function
-  return TBufferBase::readAll(buf, len);
-}
-
 uint32_t THeaderTransport::readSlow(uint8_t* buf, uint32_t len) {
-
-  if (clientType == THRIFT_UNFRAMED_DEPRECATED) {
+  if (clientType == THRIFT_UNFRAMED_BINARY || clientType == THRIFT_UNFRAMED_COMPACT) {
     return transport_->read(buf, len);
   }
 
@@ -58,6 +55,8 @@ uint32_t THeaderTransport::readSlow(uint8_t* buf, uint32_t len) {
 uint16_t THeaderTransport::getProtocolId() const {
   if (clientType == THRIFT_HEADER_CLIENT_TYPE) {
     return protoId;
+  } else if (clientType == THRIFT_UNFRAMED_COMPACT || clientType == THRIFT_FRAMED_COMPACT) {
+    return T_COMPACT_PROTOCOL;
   } else {
     return T_BINARY_PROTOCOL; // Assume other transports use TBinary
   }
@@ -70,7 +69,7 @@ void THeaderTransport::ensureReadBuffer(uint32_t sz) {
   }
 }
 
-bool THeaderTransport::readFrame(uint32_t minFrameSize) {
+bool THeaderTransport::readFrame() {
   // szN is network byte order of sz
   uint32_t szN;
   uint32_t sz;
@@ -99,18 +98,19 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
 
   sz = ntohl(szN);
 
-  ensureReadBuffer(minFrameSize + 4);
+  ensureReadBuffer(4);
 
   if ((sz & TBinaryProtocol::VERSION_MASK) == (uint32_t)TBinaryProtocol::VERSION_1) {
     // unframed
-    clientType = THRIFT_UNFRAMED_DEPRECATED;
+    clientType = THRIFT_UNFRAMED_BINARY;
     memcpy(rBuf_.get(), &szN, sizeof(szN));
-    if (minFrameSize > 4) {
-      transport_->readAll(rBuf_.get() + 4, minFrameSize - 4);
-      setReadBuffer(rBuf_.get(), minFrameSize);
-    } else {
-      setReadBuffer(rBuf_.get(), 4);
-    }
+    setReadBuffer(rBuf_.get(), 4);
+  } else if (static_cast<int8_t>(sz >> 24) == TCompactProtocol::PROTOCOL_ID
+             && (static_cast<int8_t>(sz >> 16) & TCompactProtocol::VERSION_MASK)
+                    == TCompactProtocol::VERSION_N) {
+    clientType = THRIFT_UNFRAMED_COMPACT;
+    memcpy(rBuf_.get(), &szN, sizeof(szN));
+    setReadBuffer(rBuf_.get(), 4);
   } else {
     // Could be header format or framed. Check next uint32
     uint32_t magic_n;
@@ -130,7 +130,13 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
 
     if ((magic & TBinaryProtocol::VERSION_MASK) == (uint32_t)TBinaryProtocol::VERSION_1) {
       // framed
-      clientType = THRIFT_FRAMED_DEPRECATED;
+      clientType = THRIFT_FRAMED_BINARY;
+      transport_->readAll(rBuf_.get() + 4, sz - 4);
+      setReadBuffer(rBuf_.get(), sz);
+    } else if (static_cast<int8_t>(magic >> 24) == TCompactProtocol::PROTOCOL_ID
+               && (static_cast<int8_t>(magic >> 16) & TCompactProtocol::VERSION_MASK)
+                      == TCompactProtocol::VERSION_N) {
+      clientType = THRIFT_FRAMED_COMPACT;
       transport_->readAll(rBuf_.get() + 4, sz - 4);
       setReadBuffer(rBuf_.get(), sz);
     } else if (HEADER_MAGIC == (magic & HEADER_MASK)) {
@@ -169,7 +175,7 @@ bool THeaderTransport::readFrame(uint32_t minFrameSize) {
  * Reads a string from ptr, taking care not to reach headerBoundary
  * Advances ptr on success
  *
- * @param   str                  output string
+ * @param   str             output string
  * @throws  CORRUPTED_DATA  if size of string exceeds boundary
  */
 void THeaderTransport::readString(uint8_t*& ptr,
@@ -195,7 +201,10 @@ void THeaderTransport::readHeaderFormat(uint16_t headerSize, uint32_t sz) {
   uint8_t* ptr = reinterpret_cast<uint8_t*>(rBuf_.get() + 10);
 
   // Catch integer overflow, check for reasonable header size
-  assert(headerSize < 16384);
+  if (headerSize >= 16384) {
+    throw TTransportException(TTransportException::CORRUPTED_DATA,
+                              "Header size is unreasonable");
+  }
   headerSize *= 4;
   const uint8_t* const headerBoundary = ptr + headerSize;
   if (headerSize > sz) {
@@ -249,7 +258,7 @@ void THeaderTransport::readHeaderFormat(uint16_t headerSize, uint32_t sz) {
   }
 
   // Untransform the data section.  rBuf will contain result.
-  untransform(data, sz - (data - rBuf_.get())); // ignore header in size calc
+  untransform(data, safe_numeric_cast<uint32_t>(static_cast<ptrdiff_t>(sz) - (data - rBuf_.get())));
 }
 
 void THeaderTransport::untransform(uint8_t* ptr, uint32_t sz) {
@@ -368,11 +377,11 @@ void THeaderTransport::resetProtocol() {
   clientType = THRIFT_HEADER_CLIENT_TYPE;
 
   // Read the header and decide which protocol to go with
-  readFrame(0);
+  readFrame();
 }
 
 uint32_t THeaderTransport::getWriteBytes() {
-  return wBase_ - wBuf_.get();
+  return safe_numeric_cast<uint32_t>(wBase_ - wBuf_.get());
 }
 
 /**
@@ -381,7 +390,7 @@ uint32_t THeaderTransport::getWriteBytes() {
  * Automatically advances ptr to after the written portion
  */
 void THeaderTransport::writeString(uint8_t*& ptr, const string& str) {
-  uint32_t strLen = str.length();
+  int32_t strLen = safe_numeric_cast<int32_t>(str.length());
   ptr += writeVarint32(strLen, ptr);
   memcpy(ptr, str.c_str(), strLen); // no need to write \0
   ptr += strLen;
@@ -391,7 +400,7 @@ void THeaderTransport::setHeader(const string& key, const string& value) {
   writeHeaders_[key] = value;
 }
 
-size_t THeaderTransport::getMaxWriteHeadersSize() const {
+uint32_t THeaderTransport::getMaxWriteHeadersSize() const {
   size_t maxWriteHeadersSize = 0;
   THeaderTransport::StringToStringMap::const_iterator it;
   for (it = writeHeaders_.begin(); it != writeHeaders_.end(); ++it) {
@@ -399,7 +408,7 @@ size_t THeaderTransport::getMaxWriteHeadersSize() const {
     // 2 varints32 + the strings themselves
     maxWriteHeadersSize += 5 + 5 + (it->first).length() + (it->second).length();
   }
-  return maxWriteHeadersSize;
+  return safe_numeric_cast<uint32_t>(maxWriteHeadersSize);
 }
 
 void THeaderTransport::clearHeaders() {
@@ -428,7 +437,7 @@ void THeaderTransport::flush() {
   if (clientType == THRIFT_HEADER_CLIENT_TYPE) {
     // header size will need to be updated at the end because of varints.
     // Make it big enough here for max varint size, plus 4 for padding.
-    int headerSize = (2 + getNumTransforms()) * THRIFT_MAX_VARINT32_BYTES + 4;
+    uint32_t headerSize = (2 + getNumTransforms()) * THRIFT_MAX_VARINT32_BYTES + 4;
     // add approximate size of info headers
     headerSize += getMaxWriteHeadersSize();
 
@@ -476,11 +485,11 @@ void THeaderTransport::flush() {
     // write info headers
 
     // for now only write kv-headers
-    uint16_t headerCount = writeHeaders_.size();
+    int32_t headerCount = safe_numeric_cast<int32_t>(writeHeaders_.size());
     if (headerCount > 0) {
       pkt += writeVarint32(infoIdType::KEYVALUE, pkt);
       // Write key-value headers count
-      pkt += writeVarint32(headerCount, pkt);
+      pkt += writeVarint32(static_cast<int32_t>(headerCount), pkt);
       // Write info headers
       map<string, string>::const_iterator it;
       for (it = writeHeaders_.begin(); it != writeHeaders_.end(); ++it) {
@@ -491,7 +500,7 @@ void THeaderTransport::flush() {
     }
 
     // Fixups after varint size calculations
-    headerSize = (pkt - headerStart);
+    headerSize = safe_numeric_cast<uint32_t>(pkt - headerStart);
     uint8_t padding = 4 - (headerSize % 4);
     headerSize += padding;
 
@@ -501,8 +510,13 @@ void THeaderTransport::flush() {
     }
 
     // Pkt size
+    ptrdiff_t szHbp = (headerStart - pktStart - 4);
+    if (static_cast<uint64_t>(szHbp) > static_cast<uint64_t>(std::numeric_limits<uint32_t>().max()) - (headerSize + haveBytes)) {
+      throw TTransportException(TTransportException::CORRUPTED_DATA,
+                                "Header section size is unreasonable");
+    }
     szHbo = headerSize + haveBytes          // thrift header + payload
-            + (headerStart - pktStart - 4); // common header section
+            + static_cast<uint32_t>(szHbp); // common header section
     headerSizeN = htons(headerSize / 4);
     memcpy(headerSizePtr, &headerSizeN, sizeof(headerSizeN));
 
@@ -512,13 +526,13 @@ void THeaderTransport::flush() {
 
     outTransport_->write(pktStart, szHbo - haveBytes + 4);
     outTransport_->write(wBuf_.get(), haveBytes);
-  } else if (clientType == THRIFT_FRAMED_DEPRECATED) {
+  } else if (clientType == THRIFT_FRAMED_BINARY || clientType == THRIFT_FRAMED_COMPACT) {
     uint32_t szHbo = (uint32_t)haveBytes;
     uint32_t szNbo = htonl(szHbo);
 
     outTransport_->write(reinterpret_cast<uint8_t*>(&szNbo), 4);
     outTransport_->write(wBuf_.get(), haveBytes);
-  } else if (clientType == THRIFT_UNFRAMED_DEPRECATED) {
+  } else if (clientType == THRIFT_UNFRAMED_BINARY || clientType == THRIFT_UNFRAMED_COMPACT) {
     outTransport_->write(wBuf_.get(), haveBytes);
   } else {
     throw TTransportException(TTransportException::BAD_ARGS, "Unknown client type");

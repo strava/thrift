@@ -20,21 +20,23 @@
 #include <thrift/qt/TQTcpServer.h>
 #include <thrift/qt/TQIODeviceTransport.h>
 
+#include <QMetaType>
 #include <QTcpSocket>
 
-#include <thrift/cxxfunctional.h>
+#include <thrift/stdcxx.h>
 
 #include <thrift/protocol/TProtocol.h>
 #include <thrift/async/TAsyncProcessor.h>
 
-using boost::shared_ptr;
 using apache::thrift::protocol::TProtocol;
 using apache::thrift::protocol::TProtocolFactory;
 using apache::thrift::transport::TTransport;
 using apache::thrift::transport::TTransportException;
 using apache::thrift::transport::TQIODeviceTransport;
-using apache::thrift::stdcxx::function;
 using apache::thrift::stdcxx::bind;
+using apache::thrift::stdcxx::function;
+using apache::thrift::stdcxx::placeholders::_1;
+using apache::thrift::stdcxx::shared_ptr;
 
 QT_USE_NAMESPACE
 
@@ -60,6 +62,7 @@ TQTcpServer::TQTcpServer(shared_ptr<QTcpServer> server,
                          shared_ptr<TProtocolFactory> pfact,
                          QObject* parent)
   : QObject(parent), server_(server), processor_(processor), pfact_(pfact) {
+  qRegisterMetaType<QTcpSocket*>("QTcpSocket*");
   connect(server.get(), SIGNAL(newConnection()), SLOT(processIncoming()));
 }
 
@@ -91,8 +94,7 @@ void TQTcpServer::processIncoming() {
 
     connect(connection.get(), SIGNAL(readyRead()), SLOT(beginDecode()));
 
-    // need to use QueuedConnection since we will be deleting the socket in the slot
-    connect(connection.get(), SIGNAL(disconnected()), SLOT(socketClosed()), Qt::QueuedConnection);
+    connect(connection.get(), SIGNAL(disconnected()), SLOT(socketClosed()));
   }
 }
 
@@ -109,34 +111,39 @@ void TQTcpServer::beginDecode() {
 
   try {
     processor_
-        ->process(bind(&TQTcpServer::finish, this, ctx, apache::thrift::stdcxx::placeholders::_1),
+        ->process(bind(&TQTcpServer::finish, this, ctx, _1),
                   ctx->iprot_,
                   ctx->oprot_);
   } catch (const TTransportException& ex) {
     qWarning("[TQTcpServer] TTransportException during processing: '%s'", ex.what());
-    ctxMap_.erase(connection);
+    scheduleDeleteConnectionContext(connection);
   } catch (...) {
     qWarning("[TQTcpServer] Unknown processor exception");
-    ctxMap_.erase(connection);
+    scheduleDeleteConnectionContext(connection);
   }
 }
 
 void TQTcpServer::socketClosed() {
   QTcpSocket* connection(qobject_cast<QTcpSocket*>(sender()));
   Q_ASSERT(connection);
+  scheduleDeleteConnectionContext(connection);
+}
 
-  if (ctxMap_.find(connection) == ctxMap_.end()) {
-    qWarning("[TQTcpServer] Unknown QTcpSocket closed");
-    return;
+void TQTcpServer::deleteConnectionContext(QTcpSocket* connection) {
+  const ConnectionContextMap::size_type deleted = ctxMap_.erase(connection);
+  if (0 == deleted) {
+      qWarning("[TQTcpServer] Unknown QTcpSocket");
   }
+}
 
-  ctxMap_.erase(connection);
+void TQTcpServer::scheduleDeleteConnectionContext(QTcpSocket* connection) {
+  QMetaObject::invokeMethod(this, "deleteConnectionContext", Qt::QueuedConnection, Q_ARG(QTcpSocket*, connection));
 }
 
 void TQTcpServer::finish(shared_ptr<ConnectionContext> ctx, bool healthy) {
   if (!healthy) {
     qWarning("[TQTcpServer] Processor failed to process data successfully");
-    ctxMap_.erase(ctx->connection_.get());
+    deleteConnectionContext(ctx->connection_.get());
   }
 }
 }

@@ -21,8 +21,14 @@ unit Thrift.Utils;
 
 interface
 
+{$I Thrift.Defines.inc}
+
 uses
-  Classes, Windows, SysUtils, SyncObjs;
+  {$IFDEF OLD_UNIT_NAMES}
+  Classes, Windows, SysUtils, Character, SyncObjs;
+  {$ELSE}
+  System.Classes, Winapi.Windows, System.SysUtils, System.Character, System.SyncObjs;
+  {$ENDIF}
 
 type
   IOverlappedHelper = interface
@@ -54,6 +60,18 @@ type
     class function Encode( const src : TBytes; srcOff, len : Integer; dst : TBytes; dstOff : Integer) : Integer; static;
     class function Decode( const src : TBytes; srcOff, len : Integer; dst : TBytes; dstOff : Integer) : Integer; static;
   end;
+
+
+  CharUtils = class sealed
+  public
+    class function IsHighSurrogate( const c : Char) : Boolean; static; inline;
+    class function IsLowSurrogate( const c : Char) : Boolean; static; inline;
+  end;
+
+
+{$IFDEF Win64}
+function InterlockedExchangeAdd64( var Addend : Int64; Value : Int64) : Int64;  
+{$ENDIF}
 
 
 implementation
@@ -184,6 +202,50 @@ begin
     end;
   end;
 end;
+
+
+class function CharUtils.IsHighSurrogate( const c : Char) : Boolean;
+begin
+  {$IF CompilerVersion < 23.0}
+  result := Character.IsHighSurrogate( c);
+  {$ELSE}
+  result := c.IsHighSurrogate();
+  {$IFEND}
+end;
+
+
+class function CharUtils.IsLowSurrogate( const c : Char) : Boolean;
+begin
+  {$IF CompilerVersion < 23.0}
+  result := Character.IsLowSurrogate( c);
+  {$ELSE}
+  result := c.IsLowSurrogate;
+  {$IFEND}
+end;
+
+
+{$IFDEF Win64}
+
+function InterlockedCompareExchange64( var Target : Int64; Exchange, Comparand : Int64) : Int64;  inline;
+begin
+  {$IFDEF OLD_UNIT_NAMES}
+  result := Windows.InterlockedCompareExchange64( Target, Exchange, Comparand);
+  {$ELSE}
+  result := WinApi.Windows.InterlockedCompareExchange64( Target, Exchange, Comparand);
+  {$ENDIF}
+end;
+
+
+function InterlockedExchangeAdd64( var Addend : Int64; Value : Int64) : Int64;
+var old : Int64;
+begin
+  repeat
+    Old := Addend;
+  until (InterlockedCompareExchange64( Addend, Old + Value, Old) = Old);
+  result := Old;
+end;
+
+{$ENDIF}
 
 
 end.
